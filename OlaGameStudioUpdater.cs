@@ -137,9 +137,8 @@ internal sealed class OlaUpdaterForm : Form
             client.Headers[HttpRequestHeader.Accept] = "application/vnd.github+json";
             release = client.DownloadString(api);
         }
-        Match asset = Regex.Match(release, "\\{[^{}]*\\\"name\\\"\\s*:\\s*\\\"" + Regex.Escape(ExeName) + "\\\"[^{}]*\\}");
-        if (!asset.Success) throw new InvalidOperationException("Najnowsze wydanie GitHub nie zawiera pliku " + ExeName + ".");
-        string downloadUrl = JsonString(asset.Value, "browser_download_url");
+        string downloadUrl = FindAssetDownloadUrl(release, ExeName);
+        if (String.IsNullOrEmpty(downloadUrl)) throw new InvalidOperationException("Najnowsze wydanie GitHub nie zawiera pliku " + ExeName + ".");
         string tag = JsonString(release, "tag_name");
         if (String.IsNullOrEmpty(downloadUrl) || !downloadUrl.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Niepoprawny adres pliku w GitHub Release.");
@@ -160,6 +159,49 @@ internal sealed class OlaUpdaterForm : Form
     {
         Match match = System.Text.RegularExpressions.Regex.Match(json, "\\\"" + Regex.Escape(name) + "\\\"\\s*:\\s*\\\"([^\\\"]*)\\\"");
         return match.Success ? match.Groups[1].Value : null;
+    }
+
+    private static string FindAssetDownloadUrl(string json, string expectedName)
+    {
+        int assets = json.IndexOf("\"assets\"", StringComparison.Ordinal);
+        if (assets < 0) return null;
+        int index = json.IndexOf('[', assets);
+        if (index < 0) return null;
+        index++;
+
+        while (index < json.Length)
+        {
+            while (index < json.Length && (Char.IsWhiteSpace(json[index]) || json[index] == ',')) index++;
+            if (index >= json.Length || json[index] == ']') return null;
+            if (json[index] != '{') return null;
+
+            int start = index;
+            int depth = 0;
+            bool inString = false;
+            bool escaped = false;
+            for (; index < json.Length; index++)
+            {
+                char c = json[index];
+                if (inString)
+                {
+                    if (escaped) escaped = false;
+                    else if (c == '\\') escaped = true;
+                    else if (c == '"') inString = false;
+                }
+                else if (c == '"') inString = true;
+                else if (c == '{') depth++;
+                else if (c == '}' && --depth == 0)
+                {
+                    string asset = json.Substring(start, index - start + 1);
+                    index++;
+                    if (String.Equals(JsonString(asset, "name"), expectedName, StringComparison.OrdinalIgnoreCase))
+                        return JsonString(asset, "browser_download_url");
+                    break;
+                }
+            }
+            if (depth != 0) return null;
+        }
+        return null;
     }
 
     private void CreateShortcuts()
