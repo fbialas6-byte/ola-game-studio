@@ -16,7 +16,7 @@ Pobierz `Setup_OlaGameStudio.exe` z zakladki **Releases**. Instalator pobiera na
 
 ## Budowanie na Windows
 
-Wymagany jest kompilator C# dostarczany z .NET Framework 4.x. Uruchom `build.ps1`; pliki `OlaGameStudio.exe` i `Setup_OlaGameStudio.exe` powstana w folderze `release`.
+Wymagany jest kompilator C# dostarczany z .NET Framework 4.x. Przed uruchomieniem `build.ps1` ustaw zmienna srodowiskowa `GOOGLE_OAUTH_CLIENT_SECRET`; skrypt wstawia ja tylko do tymczasowego pliku kompilacji i usuwa go po zbudowaniu. Pliki `OlaGameStudio.exe` i `Setup_OlaGameStudio.exe` powstana w folderze `release`.
 
 ## Dane lokalne
 

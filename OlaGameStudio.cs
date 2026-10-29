@@ -367,6 +367,7 @@ internal sealed class FootEggPopup : Form
 internal static class GoogleOAuth
 {
     private const string ClientId = "433050553116-bpv2k93ans9uaaojr0cqga2nbok0akn6.apps.googleusercontent.com";
+    private const string ClientSecret = "__GOOGLE_OAUTH_CLIENT_SECRET__";
     private const string AuthEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
     private const string TokenEndpoint = "https://oauth2.googleapis.com/token";
     private const string UserInfoEndpoint = "https://openidconnect.googleapis.com/v1/userinfo";
@@ -422,7 +423,7 @@ internal static class GoogleOAuth
             if (!String.Equals(state, returnedState, StringComparison.Ordinal)) throw new InvalidOperationException("Niepoprawny token state odpowiedzi Google.");
 
             string tokenResponse = PostForm(TokenEndpoint, new Dictionary<string, string> {
-                { "client_id", clientId }, { "code", code }, { "code_verifier", verifier },
+                { "client_id", clientId }, { "client_secret", ClientSecret }, { "code", code }, { "code_verifier", verifier },
                 { "grant_type", "authorization_code" }, { "redirect_uri", redirect }
             });
             string accessToken = JsonString(tokenResponse, "access_token");
