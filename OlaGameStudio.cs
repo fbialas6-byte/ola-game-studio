@@ -221,6 +221,7 @@ internal sealed class LoginForm : Form
     private readonly TextBox password = new TextBox();
     private readonly Label info = new Label();
     private readonly CheckBox remember = new CheckBox();
+    private bool footEggShown;
 
     public LoginForm()
     {
@@ -250,8 +251,29 @@ internal sealed class LoginForm : Form
         login.Click += delegate { TryLogin(); };
         create.Click += delegate { CreateAccount(); };
         google.Click += delegate { TryGoogleLogin(); };
+        username.TextChanged += HandleLoginEasterWord;
         AcceptButton = login;
         Controls.AddRange(new Control[] { heading, userLabel, username, passLabel, password, remember, login, create, google, info });
+    }
+
+    private void HandleLoginEasterWord(object sender, EventArgs e)
+    {
+        if (!String.Equals(username.Text.Trim(), "stopa", StringComparison.OrdinalIgnoreCase))
+        {
+            footEggShown = false;
+            return;
+        }
+        if (footEggShown) return;
+        footEggShown = true;
+        Rectangle work = Screen.FromControl(this).WorkingArea;
+        for (int i = 0; i < 7; i++)
+        {
+            var popup = new FootEggPopup(i);
+            int x = Left + 22 + (i % 3) * 82;
+            int y = Top + 38 + (i / 3) * 72;
+            popup.Location = new Point(Math.Max(work.Left, Math.Min(x, work.Right - popup.Width)), Math.Max(work.Top, Math.Min(y, work.Bottom - popup.Height)));
+            popup.Show(this);
+        }
     }
 
     private void TryLogin()
@@ -302,6 +324,44 @@ internal sealed class GoogleProfile
 {
     public string Email;
     public string Subject;
+}
+
+internal sealed class FootEggPopup : Form
+{
+    private readonly Timer autoClose = new Timer();
+
+    public FootEggPopup(int variant)
+    {
+        Color[] colors = { Color.FromArgb(111, 80, 222), Color.FromArgb(32, 158, 177), Color.FromArgb(228, 129, 62), Color.FromArgb(201, 77, 126) };
+        Text = "Tajemnica OLA";
+        FormBorderStyle = FormBorderStyle.FixedToolWindow;
+        StartPosition = FormStartPosition.Manual;
+        ShowInTaskbar = false;
+        ClientSize = new Size(168, 142);
+        BackColor = Color.FromArgb(250, 248, 255);
+        var art = new Panel { Left = 0, Top = 0, Width = 168, Height = 96, BackColor = BackColor };
+        Color footColor = colors[variant % colors.Length];
+        art.Paint += delegate(object sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (var brush = new SolidBrush(footColor))
+            {
+                e.Graphics.FillEllipse(brush, 62, 36, 34, 48);
+                e.Graphics.FillEllipse(brush, 49, 24, 14, 15);
+                e.Graphics.FillEllipse(brush, 63, 17, 14, 16);
+                e.Graphics.FillEllipse(brush, 77, 20, 13, 15);
+                e.Graphics.FillEllipse(brush, 89, 27, 11, 12);
+                e.Graphics.FillEllipse(brush, 47, 39, 11, 11);
+            }
+        };
+        var caption = new Label { Text = "STOPA!", Dock = DockStyle.Bottom, Height = 38, ForeColor = footColor, Font = new Font("Segoe UI", 13F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.White };
+        Controls.Add(art);
+        Controls.Add(caption);
+        autoClose.Interval = 6500;
+        autoClose.Tick += delegate { autoClose.Stop(); Close(); };
+        FormClosed += delegate { autoClose.Stop(); autoClose.Dispose(); };
+        autoClose.Start();
+    }
 }
 
 internal static class GoogleOAuth
@@ -454,6 +514,10 @@ internal static class GoogleOAuth
 
 internal sealed class StudioForm : Form
 {
+    private const string AppName = "OLA Game Studio";
+    private static readonly Color Accent = Color.FromArgb(102, 70, 220);
+    private static readonly Color AccentDark = Color.FromArgb(76, 48, 178);
+    private static readonly Color Canvas = Color.FromArgb(244, 246, 251);
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int virtualKey);
 
@@ -478,37 +542,55 @@ internal sealed class StudioForm : Form
     private int lastJumpAt = -1000;
     private int startX = 1, startY = 1;
     private string projectPath;
+    private Panel brandHeader;
+    private Label brandTitle;
+    private Label brandSubtitle;
+    private int logoClickCount;
+    private DateTime lastLogoClick;
+    private bool easterEggFound;
 
     public StudioForm()
     {
         LogoutRequested = false;
         Text = "OLA Game Studio";
-        MinimumSize = new Size(900, 660);
-        Size = new Size(1100, 760);
+        MinimumSize = new Size(960, 680);
+        Size = new Size(1160, 790);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Color.FromArgb(239, 242, 246);
-        Font = new Font("Segoe UI", 9F);
+        BackColor = Canvas;
+        Font = new Font("Segoe UI", 9.5F);
         KeyPreview = true;
         KeyDown += HandleGameKeyDown;
         KeyUp += HandleGameKeyUp;
         gameTimer.Interval = 40;
         gameTimer.Tick += StepGame;
 
-        var tabs = new TabControl { Dock = DockStyle.Fill };
-        var editorTab = new TabPage("Kreator .OLA") { BackColor = BackColor };
-        var libraryTab = new TabPage("Biblioteka gier") { BackColor = BackColor };
+        var tabs = new TabControl { Dock = DockStyle.Fill, DrawMode = TabDrawMode.OwnerDrawFixed, ItemSize = new Size(150, 38), Padding = new Point(12, 4) };
+        tabs.DrawItem += DrawStudioTab;
+        var editorTab = new TabPage("Kreator .OLA") { BackColor = Canvas, Padding = new Padding(4) };
+        var libraryTab = new TabPage("Biblioteka gier") { BackColor = Canvas, Padding = new Padding(4) };
         tabs.TabPages.Add(editorTab);
         tabs.TabPages.Add(libraryTab);
         Controls.Add(tabs);
 
-        var editor = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(12) };
-        editor.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
-        editor.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
+        brandHeader = new Panel { Dock = DockStyle.Top, Height = 78, BackColor = AccentDark, Padding = new Padding(22, 0, 22, 0) };
+        var logo = new Label { Text = "O", Left = 22, Top = 14, Width = 50, Height = 50, BackColor = Color.FromArgb(255, 255, 255), ForeColor = Accent, Font = new Font("Segoe UI", 24F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, Cursor = Cursors.Hand };
+        logo.Click += HandleLogoClick;
+        brandTitle = new Label { Text = AppName, Left = 86, Top = 13, Width = 370, Height = 32, ForeColor = Color.White, Font = new Font("Segoe UI", 19F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+        brandSubtitle = new Label { Text = "TWÓRZ  •  GRAJ  •  ODKRYWAJ", Left = 88, Top = 47, Width = 370, Height = 19, ForeColor = Color.FromArgb(218, 210, 255), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+        bool isAdmin = String.Equals(LocalAccounts.CurrentUsername, "admin", StringComparison.OrdinalIgnoreCase);
+        var formatBadge = new Label { Text = isAdmin ? "ADMINISTRATOR" : "FORMAT .OLA", Width = isAdmin ? 124 : 104, Height = 26, Top = 26, ForeColor = Color.White, BackColor = Color.FromArgb(95, 68, 193), Font = new Font("Segoe UI", 8F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, Anchor = AnchorStyles.Top | AnchorStyles.Right, Left = 1010 };
+        brandHeader.Controls.AddRange(new Control[] { logo, brandTitle, brandSubtitle, formatBadge });
+        Controls.Add(brandHeader);
+        brandHeader.BringToFront();
+
+        var editor = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(14, 10, 14, 10), BackColor = Canvas };
+        editor.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        editor.RowStyles.Add(new RowStyle(SizeType.Absolute, 82));
         editor.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        editor.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+        editor.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         editorTab.Controls.Add(editor);
 
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = Color.White, Padding = new Padding(8, 6, 4, 2), Margin = new Padding(0, 0, 0, 8) };
         AddButton(actions, "Nowa", delegate { NewProject(); });
         AddButton(actions, "Otworz .ola", delegate { OpenProject(); });
         AddButton(actions, "Zapisz .ola", delegate { SaveProject(); });
@@ -517,7 +599,7 @@ internal sealed class StudioForm : Form
         AddButton(actions, "Wyloguj", delegate { LogoutRequested = true; Close(); });
         editor.Controls.Add(actions, 0, 0);
 
-        var meta = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2, Padding = new Padding(0, 4, 0, 4) };
+        var meta = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2, Padding = new Padding(12, 7, 12, 7), BackColor = Color.White, Margin = new Padding(0, 0, 0, 8) };
         meta.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 75));
         meta.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
         meta.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 105));
@@ -527,27 +609,36 @@ internal sealed class StudioForm : Form
         meta.Controls.Add(MetaLabel("Nazwa gry"), 0, 0);
         titleBox.Dock = DockStyle.Fill;
         titleBox.Text = "Moja gra";
+        titleBox.Font = new Font("Segoe UI", 10F);
+        titleBox.BorderStyle = BorderStyle.FixedSingle;
         meta.Controls.Add(titleBox, 1, 0);
         meta.Controls.Add(MetaLabel("Link online"), 2, 0);
         urlBox.Dock = DockStyle.Fill;
+        urlBox.Font = new Font("Segoe UI", 10F);
+        urlBox.BorderStyle = BorderStyle.FixedSingle;
         meta.Controls.Add(urlBox, 3, 0);
         meta.Controls.Add(MetaLabel("Kafelek"), 0, 1);
         tilePicker.Dock = DockStyle.Left;
         tilePicker.Width = 180;
         tilePicker.DropDownStyle = ComboBoxStyle.DropDownList;
+        tilePicker.FlatStyle = FlatStyle.Flat;
+        tilePicker.Font = new Font("Segoe UI", 10F);
         tilePicker.Items.AddRange(new object[] { "Puste", "Sciana", "Gracz", "Meta", "Lawa" });
         tilePicker.SelectedIndex = 1;
         meta.Controls.Add(tilePicker, 1, 1);
-        var help = new Label { Text = "Klikaj plansze, aby budowac poziom. Skok: spacja. Lawa resetuje poziom.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.DimGray };
+        var help = new Label { Text = "Kliknij planszę, aby ją budować  •  Skok: spacja  •  Lawa resetuje poziom", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.FromArgb(92, 96, 111), Font = new Font("Segoe UI", 9F) };
         meta.Controls.Add(help, 2, 1);
         meta.SetColumnSpan(help, 2);
         editor.Controls.Add(meta, 0, 1);
 
-        board = new Board(map) { Dock = DockStyle.Fill, Margin = new Padding(4), BackColor = Color.FromArgb(25, 29, 38) };
+        board = new Board(map) { Dock = DockStyle.Fill, Margin = new Padding(0), BackColor = Color.FromArgb(25, 29, 45) };
         board.CellClicked += OnCellClick;
         editor.Controls.Add(board, 0, 2);
         status.Dock = DockStyle.Fill;
         status.TextAlign = ContentAlignment.MiddleLeft;
+        status.Padding = new Padding(10, 0, 0, 0);
+        status.BackColor = Color.White;
+        status.ForeColor = Color.FromArgb(77, 83, 98);
         status.Text = "Gotowe. Projekt .ola dziala lokalnie; link online otworzysz z biblioteki.";
         editor.Controls.Add(status, 0, 3);
 
@@ -558,23 +649,35 @@ internal sealed class StudioForm : Form
 
     private void BuildLibrary(Control parent)
     {
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(14) };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(18, 14, 18, 14), BackColor = Canvas };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
         parent.Controls.Add(root);
-        var bar = new FlowLayoutPanel { Dock = DockStyle.Fill };
+        var heading = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(14, 8, 10, 6), Margin = new Padding(0, 0, 0, 8) };
+        heading.Controls.Add(new Label { Text = "Twoja biblioteka gier", Left = 14, Top = 7, Width = 420, Height = 29, Font = new Font("Segoe UI", 15F, FontStyle.Bold), ForeColor = Color.FromArgb(39, 43, 57) });
+        heading.Controls.Add(new Label { Text = "Zbieraj projekty .ola, gry i linki w jednym miejscu.", Left = 15, Top = 36, Width = 500, Height = 20, Font = new Font("Segoe UI", 9F), ForeColor = Color.FromArgb(112, 117, 132) });
+        root.Controls.Add(heading, 0, 0);
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = Color.White, Padding = new Padding(8, 6, 4, 2), Margin = new Padding(0, 0, 0, 8) };
         AddButton(bar, "Dodaj plik gry", AddGameFile);
         AddButton(bar, "Dodaj link Roblox / online", AddOnlineGame);
         AddButton(bar, "Usun z biblioteki", RemoveGame);
         AddButton(bar, "Uruchom", LaunchSelected);
-        root.Controls.Add(bar, 0, 0);
+        root.Controls.Add(bar, 0, 1);
         library.Dock = DockStyle.Fill;
         library.Font = new Font("Segoe UI", 11F);
+        library.BackColor = Color.White;
+        library.ForeColor = Color.FromArgb(42, 47, 63);
+        library.BorderStyle = BorderStyle.None;
+        library.IntegralHeight = false;
+        library.Margin = new Padding(0, 0, 0, 8);
         library.DoubleClick += delegate { LaunchSelected(); };
-        root.Controls.Add(library, 0, 1);
-        var note = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.DimGray, Text = "Obsluga: .ola, aplikacje .exe, projekty Roblox Studio .rbxl/.rbxlx oraz adresy stron gier." };
-        root.Controls.Add(note, 0, 2);
+        var libraryCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12), Margin = new Padding(0, 0, 0, 8) };
+        libraryCard.Controls.Add(library);
+        root.Controls.Add(libraryCard, 0, 2);
+        var note = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.FromArgb(92, 96, 111), Text = "Obsługiwane: .ola  •  .exe  •  Roblox Studio .rbxl/.rbxlx  •  linki do gier" };
+        root.Controls.Add(note, 0, 3);
     }
 
     private static Label MetaLabel(string text)
@@ -584,9 +687,49 @@ internal sealed class StudioForm : Form
 
     private static void AddButton(FlowLayoutPanel panel, string text, Action action)
     {
-        var button = new Button { Text = text, AutoSize = true, Height = 34, Margin = new Padding(0, 3, 8, 3), FlatStyle = FlatStyle.Flat, BackColor = Color.White };
+        bool primary = text.StartsWith("Graj", StringComparison.OrdinalIgnoreCase) || text == "Uruchom";
+        Color baseColor = primary ? Accent : Color.FromArgb(248, 249, 252);
+        var button = new Button { Text = text, AutoSize = true, Height = 36, MinimumSize = new Size(84, 36), Margin = new Padding(0, 2, 8, 2), Padding = new Padding(10, 0, 10, 0), FlatStyle = FlatStyle.Flat, BackColor = baseColor, ForeColor = primary ? Color.White : Color.FromArgb(55, 59, 74), Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand, UseVisualStyleBackColor = false };
+        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseOverBackColor = primary ? Color.FromArgb(83, 54, 195) : Color.FromArgb(236, 232, 250);
+        button.FlatAppearance.MouseDownBackColor = primary ? AccentDark : Color.FromArgb(225, 220, 244);
         button.Click += delegate { action(); };
         panel.Controls.Add(button);
+    }
+
+    private void DrawStudioTab(object sender, DrawItemEventArgs e)
+    {
+        TabPage page = ((TabControl)sender).TabPages[e.Index];
+        bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+        using (var brush = new SolidBrush(selected ? Color.White : Canvas)) e.Graphics.FillRectangle(brush, e.Bounds);
+        if (selected)
+            using (var brush = new SolidBrush(Accent)) e.Graphics.FillRectangle(brush, e.Bounds.Left + 12, e.Bounds.Bottom - 3, e.Bounds.Width - 24, 3);
+        TextRenderer.DrawText(e.Graphics, page.Text, new Font("Segoe UI", 9F, selected ? FontStyle.Bold : FontStyle.Regular), e.Bounds, selected ? AccentDark : Color.FromArgb(100, 105, 120), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+    }
+
+    private void HandleLogoClick(object sender, EventArgs e)
+    {
+        if (easterEggFound)
+        {
+            easterEggFound = false;
+            logoClickCount = 0;
+            brandHeader.BackColor = AccentDark;
+            brandTitle.Text = AppName;
+            brandSubtitle.Text = "TWÓRZ  •  GRAJ  •  ODKRYWAJ";
+            status.Text = "Edytor gotowy. Co dziś zbudujesz?";
+            return;
+        }
+        DateTime now = DateTime.UtcNow;
+        if ((now - lastLogoClick).TotalSeconds > 2.5) logoClickCount = 0;
+        lastLogoClick = now;
+        logoClickCount++;
+        if (logoClickCount < 7) return;
+        easterEggFound = true;
+        brandHeader.BackColor = Color.FromArgb(173, 124, 28);
+        brandTitle.Text = "OLA Game Studio  ✨";
+        brandSubtitle.Text = "ZŁOTE JAJKO ODKRYTE — dzięki za grę!";
+        status.Text = "Sekret odkryty! Kliknij złote logo ponownie, aby wrócić do edytora.";
+        System.Media.SystemSounds.Asterisk.Play();
     }
 
     private void NewProject()
