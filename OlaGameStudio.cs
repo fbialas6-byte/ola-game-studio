@@ -571,7 +571,6 @@ internal sealed class StudioForm : Form
         var libraryTab = new TabPage("Biblioteka gier") { BackColor = Canvas, Padding = new Padding(4) };
         tabs.TabPages.Add(editorTab);
         tabs.TabPages.Add(libraryTab);
-        Controls.Add(tabs);
 
         brandHeader = new Panel { Dock = DockStyle.Top, Height = 78, BackColor = AccentDark, Padding = new Padding(22, 0, 22, 0) };
         var logo = new Label { Text = "O", Left = 22, Top = 14, Width = 50, Height = 50, BackColor = Color.FromArgb(255, 255, 255), ForeColor = Accent, Font = new Font("Segoe UI", 24F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, Cursor = Cursors.Hand };
@@ -581,8 +580,16 @@ internal sealed class StudioForm : Form
         bool isAdmin = String.Equals(LocalAccounts.CurrentUsername, "admin", StringComparison.OrdinalIgnoreCase);
         var formatBadge = new Label { Text = isAdmin ? "ADMINISTRATOR" : "FORMAT .OLA", Width = isAdmin ? 124 : 104, Height = 26, Top = 26, ForeColor = Color.White, BackColor = Color.FromArgb(95, 68, 193), Font = new Font("Segoe UI", 8F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, Anchor = AnchorStyles.Top | AnchorStyles.Right, Left = 1010 };
         brandHeader.Controls.AddRange(new Control[] { logo, brandTitle, brandSubtitle, formatBadge });
-        Controls.Add(brandHeader);
-        brandHeader.BringToFront();
+
+        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = new Padding(0), Padding = new Padding(0), BackColor = Canvas };
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+        shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        brandHeader.Dock = DockStyle.Fill;
+        tabs.Dock = DockStyle.Fill;
+        shell.Controls.Add(brandHeader, 0, 0);
+        shell.Controls.Add(tabs, 0, 1);
+        Controls.Add(shell);
 
         var editor = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(14, 10, 14, 10), BackColor = Canvas };
         editor.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
